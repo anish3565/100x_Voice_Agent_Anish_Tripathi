@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ask Anish: Voice Bot</title>
+<style>
+  :root { --bg:#f7f7f5; --card:#ffffff; --text:#1d1d1f; --muted:#6b6b70; --accent:#2563eb; --danger:#b91c1c; --border:#e4e4e7; --panel:#eeeef0; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg:#121214; --card:#1c1c20; --text:#f2f2f4; --muted:#a1a1aa; --accent:#60a5fa; --danger:#f87171; --border:#2f2f36; --panel:#26262c; }
+  }
+  :root[data-theme="dark"] { --bg:#121214; --card:#1c1c20; --text:#f2f2f4; --muted:#a1a1aa; --accent:#60a5fa; --danger:#f87171; --border:#2f2f36; --panel:#26262c; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; min-height:100vh; display:flex; justify-content:center; padding:24px 16px; }
+  main { width:100%; max-width:560px; display:flex; flex-direction:column; gap:18px; }
+  .top { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  h1 { font-size:1.5rem; margin:0; }
+  .tabs { display:flex; gap:4px; background:var(--panel); padding:4px; border-radius:10px; }
+  .tab { border:none; background:none; color:var(--muted); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:.9rem; font-family:inherit; }
+  .tab[aria-selected="true"] { background:var(--card); color:var(--text); box-shadow:0 1px 2px rgba(0,0,0,.08); }
+  .stack { display:flex; flex-direction:column; gap:18px; }
+  .how { color:var(--muted); margin:0; line-height:1.5; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px; }
+  .mic-wrap { display:flex; flex-direction:column; align-items:center; gap:12px; }
+  #mic { width:128px; height:128px; border-radius:50%; border:none; background:var(--accent); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 20px rgba(37,99,235,.35); transition:transform .15s; }
+  #mic:active { transform:scale(.96); }
+  #mic:disabled { opacity:.5; cursor:not-allowed; }
+  #mic.listening { background:var(--danger); animation:pulse 1.2s infinite; }
+  #mic svg { width:52px; height:52px; fill:#fff; }
+  @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(185,28,28,.5); } 100% { box-shadow:0 0 0 24px rgba(185,28,28,0); } }
+  .hint { color:var(--muted); font-size:.9rem; text-align:center; margin:0; min-height:1.2em; }
+  .controls { display:flex; gap:10px; justify-content:center; }
+  .ctrl { border:1px solid var(--border); background:var(--panel); color:var(--text); border-radius:999px; padding:8px 18px; cursor:pointer; font-size:.95rem; font-family:inherit; }
+  .ctrl.danger { color:var(--danger); }
+  form.card { display:flex; gap:8px; padding:12px; }
+  form { display:flex; gap:8px; }
+  input[type="text"] { flex:1; min-width:0; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); font-size:1rem; font-family:inherit; }
+  button.send { padding:12px 18px; border-radius:10px; border:none; background:var(--text); color:var(--bg); font-size:1rem; cursor:pointer; font-family:inherit; }
+  button.send:disabled { opacity:.5; cursor:not-allowed; }
+  #status { min-height:1.4em; color:var(--muted); font-size:.95rem; margin:0; text-align:center; display:flex; align-items:center; justify-content:center; gap:6px; }
+  #status.error { color:var(--danger); }
+  .spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--muted); border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .asked { color:var(--muted); font-size:.95rem; margin:0; }
+  #answer { font-size:1.05rem; line-height:1.6; white-space:pre-wrap; margin:0; overflow-wrap:anywhere; }
+  .answer-actions { display:flex; justify-content:flex-end; gap:14px; margin-top:12px; }
+  .link-btn { background:none; border:none; color:var(--accent); cursor:pointer; font-size:.95rem; padding:4px; font-family:inherit; }
+  .link-btn.danger { color:var(--danger); }
+  .hist-item { border-bottom:1px solid var(--border); padding:12px 0; }
+  .hist-item:last-child { border-bottom:none; }
+  details.hist-item > summary { list-style:none; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:12px; font-weight:600; padding:4px 0; }
+  details.hist-item > summary::-webkit-details-marker { display:none; }
+  details.hist-item > summary::after { content:"+"; color:var(--muted); font-weight:400; font-size:1.2rem; line-height:1; }
+  details.hist-item[open] > summary::after { content:"\2212"; }
+  .hist-body { padding-top:8px; }
+  .hist-q { font-weight:600; margin:0 0 6px; }
+  .hist-a { margin:0; line-height:1.5; color:var(--text); }
+  .hist-meta { color:var(--muted); font-size:.8rem; margin-top:6px; }
+  .muted { color:var(--muted); margin:0; }
+  .foot { color:var(--muted); font-size:.8rem; text-align:center; margin:0; line-height:1.5; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <h1>Ask Anish</h1>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button class="tab" id="tabVoice" role="tab" type="button" aria-selected="true">Voice</button>
+      <button class="tab" id="tabHistory" role="tab" type="button" aria-selected="false">History</button>
+    </nav>
+  </div>
+
+  <section id="voiceView" class="stack">
+    <p class="how"><strong>How to use:</strong> tap the microphone and ask an interview question out loud, or type it in the box below. Pause briefly when you finish. The reply appears as text and is read aloud.</p>
+
+    <section class="card mic-wrap">
+      <button id="mic" type="button" aria-label="Start listening">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>
+      </button>
+      <p id="micHint" class="hint">Tap to speak</p>
+      <div class="controls">
+        <button id="pauseBtn" class="ctrl hidden" type="button">Pause</button>
+        <button id="stopBtn" class="ctrl danger hidden" type="button">Stop</button>
+      </div>
+    </section>
+
+    <form id="textForm" class="card" autocomplete="off">
+      <input id="question" type="text" maxlength="500" placeholder="Or type your question here" aria-label="Type your question">
+      <button class="send" type="submit" id="sendBtn">Ask</button>
+    </form>
+
+    <p id="status" role="status" aria-live="polite"></p>
+
+    <section id="answerCard" class="card hidden" aria-live="polite">
+      <p id="asked" class="asked"></p>
+      <p id="answer"></p>
+      <div class="answer-actions">
+        <button id="copyBtn" class="link-btn" type="button">Copy</button>
+        <button id="replayBtn" class="link-btn" type="button">Play again</button>
+      </div>
+    </section>
+
+    <p class="foot">Answers come from Anish's profile. Use headphones so the bot does not hear its own voice.</p>
+  </section>
+
+  <section id="historyView" class="hidden">
+    <section class="card">
+      <div class="top" style="margin-bottom:10px">
+        <strong>Saved questions</strong>
+        <button id="clearAll" class="link-btn danger" type="button">Clear all</button>
+      </div>
+      <div id="historyList"></div>
+    </section>
+  </section>
+</main>
+
+<script>
+(function () {
+  var STORE_KEY = 'askAnish.history.v1';
+  var MAX_HISTORY = 100;
+  var DEBOUNCE_MS = 500;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var micBtn = $('mic'), micHint = $('micHint'), pauseBtn = $('pauseBtn'), stopBtn = $('stopBtn');
+  var form = $('textForm'), input = $('question'), sendBtn = $('sendBtn'), statusEl = $('status');
+  var answerCard = $('answerCard'), askedEl = $('asked'), answerEl = $('answer');
+  var voiceView = $('voiceView'), historyView = $('historyView'), historyList = $('historyList');
+  var tabVoice = $('tabVoice'), tabHistory = $('tabHistory');
+
+  var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var canSpeak = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+
+  var state = {
+    listening: false,
+    recognition: null,
+    segmentStart: 0,
+    resultsLen: 0,
+    heard: '',
+    timer: null,
+    paused: false,
+    speaking: false,
+    speakQueue: [],
+    currentUtt: null,
+    thinking: false,
+    controller: null,
+    lastAnswer: '',
+    error: ''
+  };
+
+  if (!SpeechRec) {
+    micBtn.disabled = true;
+    micHint.textContent = 'Voice input is not supported in this browser. Please type your question below.';
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function loadHistory() {
+    try {
+      var list = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+      return Array.isArray(list) ? list : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveHistory(list) {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(list));
+    } catch (e) { /* storage blocked: answers still work for this visit */ }
+  }
+
+  function addHistory(q, a) {
+    var list = loadHistory();
+    list.unshift({ q: q, a: a, at: Date.now() });
+    saveHistory(list.slice(0, MAX_HISTORY));
+  }
+
+  function renderHistory() {
+    var list = loadHistory();
+    historyList.innerHTML = '';
+    if (!list.length) {
+      historyList.appendChild(el('p', 'muted', 'No saved questions yet. Your questions and answers will appear here.'));
+      return;
+    }
+    list.forEach(function (item, i) {
+      var row = el('details', 'hist-item');
+      row.appendChild(el('summary', 'hist-q', item.q));
+      var body = el('div', 'hist-body');
+      body.appendChild(el('p', 'hist-a', item.a));
+      body.appendChild(el('div', 'hist-meta', new Date(item.at).toLocaleString()));
+      var copy = el('button', 'link-btn', 'Copy');
+      copy.type = 'button';
+      copy.addEventListener('click', function () {
+        if (navigator.clipboard) navigator.clipboard.writeText(item.a).catch(function () {});
+      });
+      var del = el('button', 'link-btn danger', 'Delete');
+      del.type = 'button';
+      del.addEventListener('click', function () {
+        var current = loadHistory();
+        current.splice(i, 1);
+        saveHistory(current);
+        renderHistory();
+      });
+      var actions = el('div', 'answer-actions');
+      actions.style.marginTop = '4px';
+      actions.appendChild(copy);
+      actions.appendChild(del);
+      body.appendChild(actions);
+      row.appendChild(body);
+      historyList.appendChild(row);
+    });
+  }
+
+  function switchTab(name) {
+    var voice = name === 'voice';
+    voiceView.classList.toggle('hidden', !voice);
+    historyView.classList.toggle('hidden', voice);
+    tabVoice.setAttribute('aria-selected', String(voice));
+    tabHistory.setAttribute('aria-selected', String(!voice));
+    if (!voice) renderHistory();
+  }
+
+  function setError(msg) {
+    state.error = msg || '';
+    refreshStatus();
+  }
+
+  function refreshStatus() {
+    statusEl.innerHTML = '';
+    statusEl.className = '';
+    if (state.error) {
+      statusEl.className = 'error';
+      statusEl.textContent = state.error;
+      return;
+    }
+    if (state.paused) {
+      statusEl.textContent = 'Paused. Press Resume to continue.';
+    } else if (state.thinking) {
+      statusEl.appendChild(el('span', 'spinner'));
+      statusEl.appendChild(document.createTextNode('Thinking...'));
+    } else if (state.speaking) {
+      statusEl.textContent = 'Speaking. Start talking to interrupt.';
+    } else if (state.listening) {
+      statusEl.textContent = 'Listening. Pause briefly when you finish your question.';
+    }
+  }
+
+  function updateControls() {
+    var active = state.listening || state.speaking || state.thinking;
+    var show = active || state.paused;
+    pauseBtn.classList.toggle('hidden', !show);
+    stopBtn.classList.toggle('hidden', !show);
+    pauseBtn.textContent = state.paused ? 'Resume' : 'Pause';
+    micBtn.classList.toggle('listening', state.listening);
+    micBtn.setAttribute('aria-label', state.listening ? 'Stop listening' : 'Start listening');
+    micHint.textContent = state.listening ? 'Listening... tap again to stop' : 'Tap to speak';
+    sendBtn.disabled = !input.value.trim();
+    refreshStatus();
+  }
+
+  function splitSentences(text) {
+    var parts = text.match(/[^.!?]+[.!?]+["')\]]?|[^.!?]+$/g) || [text];
+    return parts.map(function (p) { return p.trim(); }).filter(Boolean);
+  }
+
+  function unlockSpeech() {
+    if (!canSpeak) return;
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+  }
+
+  function speak(text) {
+    if (!canSpeak || !text) return;
+    stopSpeech();
+    state.speakQueue = splitSentences(text);
+    state.speaking = true;
+    updateControls();
+    if (!state.paused) playNext();
+  }
+
+  function playNext() {
+    if (state.paused) return;
+    var next = state.speakQueue.shift();
+    if (!next) {
+      state.speaking = false;
+      state.currentUtt = null;
+      updateControls();
+      return;
+    }
+    var u = new SpeechSynthesisUtterance(next);
+    u.lang = 'en-US';
+    u.rate = 1;
+    u.onend = function () { if (u === state.currentUtt) playNext(); };
+    u.onerror = function () {
+      if (u !== state.currentUtt) return;
+      state.speakQueue = [];
+      state.speaking = false;
+      state.currentUtt = null;
+      updateControls();
+    };
+    state.currentUtt = u;
+    window.speechSynthesis.speak(u);
+  }
+
+  function stopSpeech() {
+    state.speakQueue = [];
+    state.currentUtt = null;
+    state.speaking = false;
+    if (canSpeak) window.speechSynthesis.cancel();
+    updateControls();
+  }
+
+  function setPaused(on) {
+    state.paused = on;
+    if (canSpeak && state.speaking) {
+      if (on) window.speechSynthesis.pause();
+      else window.speechSynthesis.resume();
+    }
+    if (!on && state.speaking && !window.speechSynthesis.speaking) playNext();
+    if (on) clearTimeout(state.timer);
+    updateControls();
+  }
+
+  function isEcho(text) {
+    var words = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+    if (words.length < 3 || !state.lastAnswer) return false;
+    var answerWords = {};
+    state.lastAnswer.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).forEach(function (w) { answerWords[w] = true; });
+    var hits = words.filter(function (w) { return answerWords[w]; }).length;
+    return hits / words.length >= 0.8;
+  }
+
+  function startRecognition() {
+    var rec = new SpeechRec();
+    rec.lang = 'en-US';
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+    state.recognition = rec;
+    state.segmentStart = 0;
+    state.resultsLen = 0;
+
+    rec.onresult = function (event) {
+      if (state.paused) return;
+      state.resultsLen = event.results.length;
+      var text = '';
+      for (var i = state.segmentStart; i < event.results.length; i++) {
+        text += event.results[i][0].transcript;
+      }
+      text = text.trim();
+      if (!text) return;
+      if (state.speaking) {
+        if (isEcho(text)) return;
+        stopSpeech();
+      }
+      setError('');
+      state.heard = text;
+      input.value = text;
+      sendBtn.disabled = false;
+      clearTimeout(state.timer);
+      state.timer = setTimeout(flushHeard, DEBOUNCE_MS);
+    };
+
+    rec.onerror = function (event) {
+      if (event.error === 'no-speech' || event.error === 'aborted') return;
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        state.listening = false;
+        setError('Microphone access is blocked. Allow it in your browser settings, or type your question instead.');
+      } else {
+        setError('Voice input had a problem. Try again or type your question.');
+      }
+      updateControls();
+    };
+
+    rec.onend = function () {
+      state.recognition = null;
+      if (state.listening) {
+        setTimeout(function () { if (state.listening && !state.recognition) startRecognition(); }, 250);
+      }
+      updateControls();
+    };
+
+    try {
+      rec.start();
+    } catch (e) {
+      state.listening = false;
+      setError('Could not start the microphone. Please try again.');
+      updateControls();
+    }
+  }
+
+  function startListening() {
+    unlockSpeech();
+    setError('');
+    state.listening = true;
+    if (!state.recognition) startRecognition();
+    updateControls();
+  }
+
+  function stopListening() {
+    state.listening = false;
+    clearTimeout(state.timer);
+    state.heard = '';
+    input.value = '';
+    if (state.recognition) {
+      var rec = state.recognition;
+      state.recognition = null;
+      rec.onend = null;
+      rec.abort();
+    }
+    updateControls();
+  }
+
+  function flushHeard() {
+    var text = state.heard.trim();
+    state.heard = '';
+    state.segmentStart = state.resultsLen;
+    input.value = '';
+    if (text) sendQuestion(text);
+    else updateControls();
+  }
+
+  function stopAll() {
+    stopListening();
+    stopSpeech();
+    if (state.controller) state.controller.abort();
+    state.controller = null;
+    state.thinking = false;
+    state.paused = false;
+    setError('');
+    updateControls();
+  }
+
+  async function sendQuestion(raw) {
+    var text = (raw || '').trim().slice(0, 500);
+    if (!text) return;
+    if (state.paused) {
+      setError('Paused. Press Resume before asking another question.');
+      return;
+    }
+    if (state.controller) state.controller.abort();
+    stopSpeech();
+    setError('');
+    input.value = '';
+    askedEl.textContent = 'You asked: ' + text;
+    answerCard.classList.add('hidden');
+
+    var ctrl = new AbortController();
+    state.controller = ctrl;
+    state.thinking = true;
+    updateControls();
+
+    try {
+      var res = await fetch('/api/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: text }),
+        signal: ctrl.signal
+      });
+      var data = await res.json().catch(function () { return {}; });
+      if (ctrl !== state.controller) return;
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong. Please try again.');
+        return;
+      }
+      state.lastAnswer = data.answer;
+      answerEl.textContent = data.answer;
+      answerCard.classList.remove('hidden');
+      addHistory(text, data.answer);
+      speak(data.answer);
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      if (ctrl === state.controller) setError('Could not reach the bot. Check your connection and try again.');
+    } finally {
+      if (ctrl === state.controller) {
+        state.controller = null;
+        state.thinking = false;
+        updateControls();
+      }
+    }
+  }
+
+  micBtn.addEventListener('click', function () {
+    if (state.listening) stopListening(); else startListening();
+  });
+  pauseBtn.addEventListener('click', function () { setPaused(!state.paused); });
+  stopBtn.addEventListener('click', stopAll);
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    unlockSpeech();
+    sendQuestion(input.value);
+  });
+  input.addEventListener('input', function () { sendBtn.disabled = !input.value.trim(); });
+
+  $('replayBtn').addEventListener('click', function () {
+    unlockSpeech();
+    speak(state.lastAnswer);
+  });
+  $('copyBtn').addEventListener('click', function () {
+    if (navigator.clipboard) navigator.clipboard.writeText(state.lastAnswer).catch(function () {});
+  });
+
+  tabVoice.addEventListener('click', function () { switchTab('voice'); });
+  tabHistory.addEventListener('click', function () { switchTab('history'); });
+  $('clearAll').addEventListener('click', function () {
+    if (!window.confirm('Delete all saved questions on this device?')) return;
+    saveHistory([]);
+    renderHistory();
+  });
+
+  updateControls();
+})();
+</script>
+</body>
+</html>
