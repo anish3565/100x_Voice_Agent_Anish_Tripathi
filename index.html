@@ -120,6 +120,7 @@
   var STORE_KEY = 'askAnish.history.v1';
   var MAX_HISTORY = 100;
   var DEBOUNCE_MS = 500;
+  var MIN_INTERRUPT_WORDS = 3;
 
   var $ = function (id) { return document.getElementById(id); };
   var micBtn = $('mic'), micHint = $('micHint'), pauseBtn = $('pauseBtn'), stopBtn = $('stopBtn');
@@ -335,6 +336,11 @@
     return hits / words.length >= 0.8;
   }
 
+  function dropFinishedResults(results) {
+    var last = results.length - 1;
+    state.segmentStart = last >= 0 && !results[last].isFinal ? last : results.length;
+  }
+
   function startRecognition() {
     var rec = new SpeechRec();
     rec.lang = 'en-US';
@@ -355,7 +361,10 @@
       text = text.trim();
       if (!text) return;
       if (state.speaking) {
-        if (isEcho(text)) return;
+        if (isEcho(text) || text.split(/\s+/).length < MIN_INTERRUPT_WORDS) {
+          dropFinishedResults(event.results);
+          return;
+        }
         stopSpeech();
       }
       setError('');
