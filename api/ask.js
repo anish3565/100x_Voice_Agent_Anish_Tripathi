@@ -84,22 +84,6 @@ async function askGemini(apiKey, system, question) {
   return parts.map(p => p.text || '').join('').trim();
 }
 
-const BANNED_PHRASES = [
-  'I focused on', 'I was responsible for', 'designed to', 'helped me', 'keeps me',
-  'prevents me', 'I realized', 'I learned', 'part of my', 'focused on', 'I specialize',
-  'equips me', 'this approach',
-];
-
-function bannedPhrasesIn(text, profile) {
-  if (!text) return [];
-  const lowerText = text.toLowerCase();
-  const lowerProfile = profile.toLowerCase();
-  return BANNED_PHRASES.filter(p => {
-    const lp = p.toLowerCase();
-    return lowerText.includes(lp) && !lowerProfile.includes(lp);
-  });
-}
-
 async function generate(groqKey, geminiKey, system, question) {
   let answer = '';
   let failure = null;
@@ -149,14 +133,7 @@ module.exports = async (req, res) => {
   const profile = fs.readFileSync(path.join(__dirname, '..', 'profile', 'answers.md'), 'utf8');
   const system = buildSystemPrompt(profile);
 
-  let { answer, failure } = await generate(groqKey, geminiKey, system, question);
-
-  const banned = bannedPhrasesIn(answer, profile);
-  if (answer && banned.length) {
-    const retrySystem = `${system}\n\nYour previous answer used phrases that are not allowed: ${banned.map(p => `"${p}"`).join(', ')}. Rewrite the answer using only facts stated in the PROFILE, and do not use those phrases.`;
-    const retry = await generate(groqKey, geminiKey, retrySystem, question);
-    if (retry.answer) answer = retry.answer;
-  }
+  const { answer, failure } = await generate(groqKey, geminiKey, system, question);
 
   if (answer) {
     res.status(200).json({ answer: limitSentences(answer) });
