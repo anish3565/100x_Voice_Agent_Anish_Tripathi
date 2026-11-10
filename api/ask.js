@@ -43,7 +43,7 @@ async function askGroq(apiKey, system, question) {
       body: JSON.stringify({
         model: GROQ_MODEL,
         temperature: 0.4,
-        max_tokens: 1000,
+        max_tokens: 500,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: question },
